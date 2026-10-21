@@ -1,0 +1,103 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Caderno Sombrio</title>
+<style>
+:root{--bg:#0b0b0d;--paper:#16161a;--ink:#e8e4da;--red:#b3201f;--mute:#8a867c;--line:#2a2a31}
+*{box-sizing:border-box}
+html,body{margin:0;height:100%;background:var(--bg);color:var(--ink);font-family:Georgia,'Times New Roman',serif}
+body{padding:env(safe-area-inset-top) 0 env(safe-area-inset-bottom)}
+#cover{position:fixed;inset:0;z-index:5;display:flex;flex-direction:column;align-items:center;justify-content:center;background:#050506;cursor:pointer;transition:opacity .6s}
+#cover.open{opacity:0;pointer-events:none}
+#cover h1{font-size:2rem;letter-spacing:.35em;text-transform:uppercase;margin:0 0 .5rem;border:2px solid var(--ink);padding:1.2rem 1.6rem}
+#cover p{color:var(--mute);font-size:.85rem}
+main{max-width:520px;margin:0 auto;padding:1.2rem}
+h2{font-size:1rem;letter-spacing:.2em;text-transform:uppercase;color:var(--mute);margin:1.4rem 0 .6rem}
+.page{background:var(--paper);border:1px solid var(--line);border-radius:6px;padding:1rem;
+background-image:repeating-linear-gradient(transparent 0 31px,var(--line) 31px 32px)}
+input{width:100%;background:transparent;border:0;border-bottom:1px solid var(--mute);color:var(--ink);font:inherit;font-size:1.1rem;padding:.5rem 0;outline:none}
+input:focus{border-color:var(--red)}
+button{margin-top:.8rem;background:var(--red);color:#fff;border:0;border-radius:4px;padding:.6rem 1rem;font:inherit;letter-spacing:.1em}
+button.ghost{background:transparent;border:1px solid var(--mute);color:var(--mute)}
+.count{font-size:2.6rem;color:var(--red);text-align:center;margin:.3rem 0}
+.entry{padding:.45rem 0;border-bottom:1px dashed var(--line)}
+.entry b{text-decoration:line-through;text-decoration-color:var(--red);text-decoration-thickness:2px}
+.entry small{display:block;color:var(--mute)}
+.rules{color:var(--mute);font-size:.9rem;line-height:1.5}
+.note{color:var(--mute);font-size:.75rem;text-align:center;margin:2rem 0 1rem}
+</style>
+</head>
+<body>
+<div id="cover"><h1>Caderno<br>Sombrio</h1><p>toque para abrir</p></div>
+<main>
+  <h2>Escreva um nome</h2>
+  <div class="page">
+    <input id="name" placeholder="Nome (personagem fictício)" maxlength="60" autocomplete="off">
+    <button id="add">Escrever</button>
+  </div>
+
+  <div id="activeBox"></div>
+
+  <h2>Páginas escritas</h2>
+  <div class="page" id="list"></div>
+  <button class="ghost" id="clear">Rasgar todas as páginas</button>
+
+  <h2>Regras</h2>
+  <div class="rules page">
+    1. Escreva um nome e a causa da morte em até 40 segundos.<br>
+    2. Sem causa, o destino padrão é um ataque cardíaco.<br>
+    3. Páginas escritas não podem ser desfeitas (só rasgadas).
+  </div>
+  <p class="note">Obra de ficção para entretenimento. Use nomes de personagens.</p>
+</main>
+<script>
+const $=s=>document.querySelector(s);
+const esc=s=>s.replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const load=(k,d)=>{try{return JSON.parse(localStorage.getItem(k))??d}catch(e){return d}};
+const save=(k,v)=>{try{localStorage.setItem(k,JSON.stringify(v))}catch(e){}};
+let entries=load('cs_entries',[]);
+let active=load('cs_active',null);
+
+$('#cover').onclick=()=>$('#cover').classList.add('open');
+
+function renderList(){
+  $('#list').innerHTML=entries.length?entries.map(e=>
+    `<div class="entry"><b>${esc(e.name)}</b><small>${esc(e.cause)} · ${new Date(e.at).toLocaleString('pt-BR')}</small></div>`
+  ).join(''):'<span class="rules">Nenhuma página escrita ainda.</span>';
+}
+function renderActive(){
+  if(!active){$('#activeBox').innerHTML='';return}
+  $('#activeBox').innerHTML=`<h2>Causa da morte</h2><div class="page">
+    <b>${esc(active.name)}</b>
+    <div class="count" id="left">40</div>
+    <input id="cause" placeholder="Descreva a causa (opcional)" maxlength="120" autocomplete="off">
+    <button id="done">Confirmar</button></div>`;
+  $('#done').onclick=()=>finish($('#cause').value.trim());
+}
+function finish(cause){
+  if(!active)return;
+  entries.unshift({name:active.name,cause:cause||'ataque cardíaco',at:Date.now()});
+  active=null;save('cs_entries',entries);save('cs_active',null);
+  renderActive();renderList();
+}
+$('#add').onclick=()=>{
+  const n=$('#name').value.trim();
+  if(!n||active)return;
+  active={name:n,t0:Date.now()};save('cs_active',active);
+  $('#name').value='';renderActive();
+};
+$('#clear').onclick=()=>{
+  if(confirm('Rasgar todas as páginas?')){entries=[];save('cs_entries',entries);renderList()}
+};
+setInterval(()=>{
+  if(!active)return;
+  const left=Math.ceil((active.t0+40000-Date.now())/1000);
+  if(left<=0){const c=$('#cause');finish(c?c.value.trim():'')}
+  else{const el=$('#left');if(el)el.textContent=left}
+},500);
+renderActive();renderList();
+</script>
+</body>
+</html>
